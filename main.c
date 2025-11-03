@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define cantidadLetrasMP 20
 #define  cantidadLetrasMS 20
@@ -17,7 +18,7 @@ void cargarPalabrasMemoriaPrincipal();
 char* obtenerPalabra(int indexPalabra);
 void cargarVectorPalabras();
 void imprimirMemoriaSecundaria();
-
+void pedirFrase();
 
 
 void cargarVectorPalabras(){
@@ -86,11 +87,41 @@ void imprimirMemoriaSecundaria(){
         printf("\n");
     }
 }
+
+
 void pedirFrase(){
     char frase[100]; // Buffer para la frase completa
-    char palabras[10][20];
+    char palabras[10][20];//cantidad de palabras y letras 
+    int cont=0;
+    int contFilas=0;
+
+    bool termino=false;
     printf("INGRESE UNA FRASE DE MINIMO 6 PALABRAS ");
-    scanf("%d", &frase);
+
+     fgets(frase, sizeof(frase), stdin);
+    
+    while(termino){
+        
+        if(frase[cont] != ' '){
+            printf("entro a el if de diferente a vacio");
+            palabras[contFilas][cont]=frase[cont];
+        } else if(frase[cont] == ' '){
+            printf("entro a el if de vacio");
+            contFilas++;
+        }
+
+        if(cont == sizeof(frase)){
+            termino=true;
+            printf("termino");
+        }
+        cont++;
+    }
+
+  for(int i = 0; i < 10; i++) {
+    if(palabras[i][0] != '\0') { // Si no está vacía
+        printf("%s ", palabras[i]);
+    }
+}
 }
 int main (void){
 
@@ -98,5 +129,6 @@ int main (void){
     cargarPalabrasMemoriaPrincipal();
     cargarPalabrasMemoriaSecundaria();
     //imprimirMemoriaPrincipal();
-    imprimirMemoriaSecundaria();
+    //imprimirMemoriaSecundaria();
+    pedirFrase();
 }
