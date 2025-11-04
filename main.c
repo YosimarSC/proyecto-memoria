@@ -13,6 +13,7 @@
 char memoriaPrincipal[81][6][cantidadLetrasMP];
 char memoriaSecundaria [162][6][cantidadLetrasMS];
 char palabras[9360][20];
+char palabrasCargadas [9360][15];
 // ----------declarar metodos y funciones--------
 void cargarPalabrasMemoriaPrincipal();
 char* obtenerPalabra(int indexPalabra);
@@ -20,6 +21,12 @@ void cargarVectorPalabras();
 void imprimirMemoriaSecundaria();
 void pedirFrase();
 
+
+struct Letra {
+    char letra;
+    int cantidad;
+};
+struct Letra iniciales[26];
 
 void cargarVectorPalabras(){
    FILE* archivo = fopen("palabras.txt", "r");
@@ -36,6 +43,8 @@ void cargarVectorPalabras(){
     fclose(archivo);
 }
 char* obtenerPalabra(int indexPalabra){
+    //int random=rand()*9360; cargar palabras random
+
     return palabras[indexPalabra];
 }
 void cargarPalabrasMemoriaPrincipal(){
@@ -89,42 +98,91 @@ void imprimirMemoriaSecundaria(){
 }
 
 
-void pedirFrase(){
-    char frase[100]; // Buffer para la frase completa
-    char palabras[10][20];//cantidad de palabras y letras 
-    int cont=0;
-    int contFilas=0;
 
-    bool termino=false;
-    printf("INGRESE UNA FRASE DE MINIMO 6 PALABRAS ");
 
-     fgets(frase, sizeof(frase), stdin);
-    
-    while(termino){
-        
-        if(frase[cont] != ' '){
-            printf("entro a el if de diferente a vacio");
-            palabras[contFilas][cont]=frase[cont];
-        } else if(frase[cont] == ' '){
-            printf("entro a el if de vacio");
-            contFilas++;
+void pedirFrase() {
+    char frase[200];
+    char palabrasFrase[10][20]; 
+    int contPalabras = 0;
+    int contCol = 0;
+   
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+    printf("INGRESE UNA FRASE: ");
+    fgets(frase, sizeof(frase), stdin);
+    printf("%s", frase);
+
+    for (int i = 0; i < 26; i++) {
+        iniciales[i].letra = 'a' + i;
+        iniciales[i].cantidad = 0;
+    }
+    // 
+    size_t len = strlen(frase);
+
+    char inicial=' ';
+    int leyendoPalabra = 0; // indica si se esta procesando la palabra
+
+    for (int i = 0; i <= len; i++) {
+        char c = frase[i];
+
+        // Si no es espacio ni fin de cadena entonces es parte de una palabra
+        if (c != ' ' ) {
+            if (leyendoPalabra==0) {
+                leyendoPalabra = 1; // empieza una nueva palabra
+                inicial=c;
+                if (contPalabras >= 10) break;
+                contCol = 0;
+
+               for (int j = 0; j < 26; j++) {//contar la inicial
+                    if (iniciales[j].letra == inicial) {
+                        iniciales[j].cantidad++;
+                        break;
+                    }
+                }
+            }
+             palabrasFrase[contPalabras][contCol++] = c;
+          
+            
+        } 
+        // Si hay espacio o ficerramos la palabra
+        else {
+            if (leyendoPalabra) {
+                contPalabras++;
+                leyendoPalabra = 0;
+            }
         }
-
-        if(cont == sizeof(frase)){
-            termino=true;
-            printf("termino");
-        }
-        cont++;
     }
 
-  for(int i = 0; i < 10; i++) {
-    if(palabras[i][0] != '\0') { // Si no está vacía
-        printf("%s ", palabras[i]);
+    // Validar minimo de palabras
+    if (contPalabras < 6) {
+        printf("Error: se ingresaron %d palabras el minimo son 6.\n", contPalabras);
+        return;
+    }
+
+    // Validar que no haya mas de 2 con la misma letra inicial
+    int LimiteIniciales = 0;
+    for (int i = 0; i < 26; i++) {
+        if (iniciales[i].cantidad > 2) {
+           LimiteIniciales=1;
+            printf("Error: más de 2 palabras con la misma letra inicial: ");
+        }
+    }
+
+    if (LimiteIniciales==1) {
+        printf("\nPor favor ingrese una frase donde ninguna letra inicial se repita mas de 2 veces.\n");
+        return;
+    }
+
+    // Mostrar las palabras
+    printf("\nFrase válida. Palabras extraídas (%d):\n", contPalabras);
+    for (int i = 0; i < contPalabras; i++) {
+        printf("%s\n", palabrasFrase[i]);
     }
 }
-}
+
+
 int main (void){
-
+    
     cargarVectorPalabras();
     cargarPalabrasMemoriaPrincipal();
     cargarPalabrasMemoriaSecundaria();
