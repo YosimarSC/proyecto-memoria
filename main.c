@@ -2,31 +2,40 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <ctype.h>
+#include <time.h>
 
-// Constantes
-#define PALABRAS_POR_PAGINA 6
-#define PAGINAS_PRINCIPAL 81
-#define PAGINAS_SECUNDARIA 162
-#define TOTAL_PALABRAS 9360
+#define PalabrasPorPagina 6
+#define PaginasPrincipal 81
+#define PaginasSecundaria 162
+#define TotalPalabras 9360
 
-// ------variables globales----- 
+// variables globales
 struct Pagina {
-    char palabras[PALABRAS_POR_PAGINA][20];
-    int R;  // Bit de referencia
-    int M;  // Bit de modificación
+    char palabras[PalabrasPorPagina][20];
+    int R;  
+    int M;  
     unsigned long referencias;
 };
 
-struct Pagina memoriaPrincipal[PAGINAS_PRINCIPAL];
-struct Pagina memoriaSecundaria[PAGINAS_SECUNDARIA];
-char palabras[TOTAL_PALABRAS][20];
+struct Pagina memoriaPrincipal[PaginasPrincipal];
+struct Pagina memoriaSecundaria[PaginasSecundaria];
+char palabrasArchivo[TotalPalabras][20];
 
-// Variables para estadísticas
+// Variables para estadisticas
 unsigned long totalReferencias = 0;
 unsigned long totalReemplazos = 0;
 unsigned long fallosPagina = 0;
+int paginasConBitCambiado[20];
+int contadorBitsCambiados = 0;
 
-// ----------declarar metodos y funciones--------
+struct Letra {
+    char letra;
+    int cantidad;
+};
+struct Letra iniciales[26];
+
+//  metodos y funciones
 void cargarVectorPalabras();
 char* obtenerPalabra(int indexPalabra);
 void cargarPalabrasMemoriaPrincipal();
@@ -36,16 +45,17 @@ void imprimirMemoriaSecundaria();
 void pedirFrase();
 int buscarPalabraEnPrincipal(char *palabra);
 int buscarPalabraEnSecundaria(char *palabra);
-void algoritmoClock();
-void algoritmoNRU();
+int buscarPalabraEnArchivo(char *palabra);
+int algoritmoClock();
+int algoritmoNRU();
 void mostrarEstadisticas();
 void guardarEstadisticasEnArchivo();
-
-struct Letra {
-    char letra;
-    int cantidad;
-};
-struct Letra iniciales[26];
+void cambiarBits();
+void cargarPaginaMemoriaPrincipal(int paginaSecundaria);
+void menuImpresionMemoria();
+void mostrarPaginasMasReferenciadas();
+void mostrarPaginasQueCambiaronBit();
+int validarSoloLetras(char *frase);
 
 void cargarVectorPalabras(){
    FILE* archivo = fopen("palabras.txt", "r");
@@ -55,21 +65,21 @@ void cargarVectorPalabras(){
     }
 
     int cont=0;
-    while(cont < TOTAL_PALABRAS){
-        fscanf(archivo, "%19s", palabras[cont]);
+    while(cont < TotalPalabras){
+        fscanf(archivo, "%19s", palabrasArchivo[cont]);
         cont ++;
     }
     fclose(archivo);
 }
 
 char* obtenerPalabra(int indexPalabra){
-    return palabras[indexPalabra];
+    return palabrasArchivo[indexPalabra];
 }
 
 void cargarPalabrasMemoriaPrincipal(){
     int cont = 0;
-    for(int i=0; i<PAGINAS_PRINCIPAL; i++){
-        for(int j=0; j<PALABRAS_POR_PAGINA; j++){
+    for(int i=0; i<PaginasPrincipal; i++){
+        for(int j=0; j<PalabrasPorPagina; j++){
             if(cont % 18 == 0){
                  cont += 342;
             }
@@ -84,8 +94,8 @@ void cargarPalabrasMemoriaPrincipal(){
 
 void cargarPalabrasMemoriaSecundaria(){
     int cont = 0;
-    for(int i=0; i<PAGINAS_SECUNDARIA; i++){
-        for(int j=0; j<PALABRAS_POR_PAGINA; j++){
+    for(int i=0; i<PaginasSecundaria; i++){
+        for(int j=0; j<PalabrasPorPagina; j++){
             if(cont % 36 == 0){
                 cont += 324;
             }
@@ -97,177 +107,255 @@ void cargarPalabrasMemoriaSecundaria(){
 }
 
 void imprimirMemoriaPrincipal(){
-    for(int i=0; i<PAGINAS_PRINCIPAL; i++){
-        printf("Pagina %d (R=%d, M=%d): ", i, memoriaPrincipal[i].R, memoriaPrincipal[i].M);
-        for(int j=0; j<PALABRAS_POR_PAGINA; j++){
-            printf("%s   ", memoriaPrincipal[i].palabras[j]);
+    for(int i=0;i<81;i++){
+        for(int j=0;j<6;j++){
+            printf("%s   ",memoriaPrincipal[i].palabras[j]);
         }
         printf("\n");
     }
 }
-
 void imprimirMemoriaSecundaria(){
-    for(int i=0; i<PAGINAS_SECUNDARIA; i++){
-        printf("Pagina %d: ", i);
-        for(int j=0; j<PALABRAS_POR_PAGINA; j++){
-            printf("%s   ", memoriaSecundaria[i].palabras[j]);
+    for(int i=0;i<162;i++){
+        for(int j=0;j<6;j++){
+
+            printf("%s   ",memoriaSecundaria[i].palabras[j]);
         }
         printf("\n");
     }
 }
 
-// Funciones de tu compañero adaptadas
 int buscarPalabraEnPrincipal(char *palabra) {
-    for (int i = 0; i < PAGINAS_PRINCIPAL; i++)
-        for (int j = 0; j < PALABRAS_POR_PAGINA; j++)
+    for (int i = 0; i < PaginasPrincipal; i++){
+        for (int j = 0; j < PalabrasPorPagina; j++){
             if (strcmp(memoriaPrincipal[i].palabras[j], palabra) == 0) {
                 memoriaPrincipal[i].R = 1;
                 memoriaPrincipal[i].referencias++;
                 totalReferencias++;
-                return 1;
+                return i;
             }
-    return 0;
+        }
+    }
+    return -1;
 }
 
 int buscarPalabraEnSecundaria(char *palabra) {
-    for (int i = 0; i < PAGINAS_SECUNDARIA; i++)
-        for (int j = 0; j < PALABRAS_POR_PAGINA; j++)
-            if (strcmp(memoriaSecundaria[i].palabras[j], palabra) == 0) {
+
+    for (int i = 0; i < PaginasSecundaria; i++){
+        for (int j = 0; j < PalabrasPorPagina; j++){
+            if (strcmp(memoriaSecundaria[i].palabras[j], palabra) == 0){// si la palabra coincide con alguna de memoria princ{
                 memoriaSecundaria[i].referencias++;
                 totalReferencias++;
-                return 1;
+                return i;
             }
-    return 0;
+        }
+    }
+    return -1;
 }
 
-void algoritmoClock() {
+int buscarPalabraEnArchivo(char *palabra) {
+    for (int i = 0; i < TotalPalabras; i++) {
+        if (strcmp(palabrasArchivo[i], palabra) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int algoritmoClock() {
     static int puntero = 0;
-    int reemplazada = 0;
-    for (int i = 0; i < PAGINAS_PRINCIPAL * 2 && !reemplazada; i++) {
+    int paginaReemplazo = -1;
+    
+    for (int i = 0; i < PaginasPrincipal * 2 && paginaReemplazo == -1; i++) {
         if (memoriaPrincipal[puntero].R == 0) {
-            printf("Reemplazando página %d (Clock)\n", puntero);
-            memoriaPrincipal[puntero].M = 0;
-            memoriaPrincipal[puntero].R = 0;
+            paginaReemplazo = puntero;
+            printf("Reemplazando pagina %d (Clock)\n", puntero);
             totalReemplazos++;
-            reemplazada = 1;
         } else {
             memoriaPrincipal[puntero].R = 0;
         }
-        puntero = (puntero + 1) % PAGINAS_PRINCIPAL;
+        puntero = (puntero + 1) % PaginasPrincipal;
     }
-    if (!reemplazada)
-        printf("No se encontró página con R=0\n");
-}
-
-void algoritmoNRU() {
-    int candidato = -1;
-    for (int i = 0; i < PAGINAS_PRINCIPAL; i++) {
-        if (memoriaPrincipal[i].R == 0 && memoriaPrincipal[i].M == 0) { 
-            candidato = i; 
-            break; 
-        }
-        else if (memoriaPrincipal[i].R == 0 && candidato == -1) 
-            candidato = i;
+    
+    if (paginaReemplazo == -1) {
+        printf("No se encontro pagina con R=0\n");
+        paginaReemplazo = 0;
     }
-    if (candidato != -1) {
-        printf("Reemplazando página %d (NRU)\n", candidato);
-        memoriaPrincipal[candidato].M = 0;
-        memoriaPrincipal[candidato].R = 0;
-        totalReemplazos++;
-    } else {
-        printf("No se encontró página candidata.\n");
-    }
+    
+    return paginaReemplazo;
 }
 
 void mostrarEstadisticas() {
-    printf("\n=== ESTADISTICAS DEL SISTEMA ===\n");
+    printf("\nESTADISTICAS \n");
     printf("Total de referencias: %lu\n", totalReferencias);
     printf("Total de reemplazos: %lu\n", totalReemplazos);
-    printf("Total de fallos de página: %lu\n", fallosPagina);
+    printf("Total de fallos de pagina: %lu\n", fallosPagina);
     unsigned long totalUsos = 0;
-    for (int i = 0; i < PAGINAS_PRINCIPAL; i++)
+    for (int i = 0; i < PaginasPrincipal; i++)
         totalUsos += memoriaPrincipal[i].referencias;
-    printf("Promedio de referencias por página: %.2f\n",
-           (float) totalUsos / PAGINAS_PRINCIPAL);
+    printf("Promedio de referencias por pagina: %.2f\n",
+           (float) totalUsos / PaginasPrincipal);
 }
 
 void guardarEstadisticasEnArchivo() {
     FILE *f = fopen("resultados.txt", "a");
-    if (!f) {
-        printf("No se pudo crear resultados.txt\n");
-        return;
-    }
-    fprintf(f, "------------------------------\n");
-    fprintf(f, "Estadísticas de ejecución:\n");
+  
+    fprintf(f, "--Estadisticas--:\n");
     fprintf(f, "Total de referencias: %lu\n", totalReferencias);
     fprintf(f, "Total de reemplazos: %lu\n", totalReemplazos);
-    fprintf(f, "Total de fallos de página: %lu\n", fallosPagina);
+    fprintf(f, "Total de fallos de pagina: %lu\n", fallosPagina);
     unsigned long totalUsos = 0;
-    for (int i = 0; i < PAGINAS_PRINCIPAL; i++)
+    for (int i = 0; i < PaginasPrincipal; i++)
         totalUsos += memoriaPrincipal[i].referencias;
-    fprintf(f, "Promedio de referencias por página: %.2f\n",
-            (float) totalUsos / PAGINAS_PRINCIPAL);
+    fprintf(f, "Promedio de referencias por paginas: %.2f\n",
+            (float) totalUsos / PaginasPrincipal);
     fprintf(f, "------------------------------\n\n");
     fclose(f);
-    printf("Estadísticas guardadas en resultados.txt\n");
+    printf("Estadisticas guardadas en resultados.txt\n");
 }
 
-// Tu función pedirFrase modificada para usar las nuevas funciones
+int validarSoloLetras(char *frase) {
+    for (int i = 0; frase[i] != '\0'; i++) {
+        if (!isalpha(frase[i]) && frase[i] != ' ') {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void cambiarBits() {
+    contadorBitsCambiados = 0;
+    printf("Modificando bits R de 10 paginas aleatorias:\n");
+    for(int i = 0; i < 10; i++) {
+        int NumeroPag = rand() % PaginasPrincipal;
+        memoriaPrincipal[NumeroPag].R = !memoriaPrincipal[NumeroPag].R;
+        paginasConBitCambiado[contadorBitsCambiados++] = NumeroPag;
+        printf("pagina %d: R cambio a %d\n", NumeroPag, memoriaPrincipal[NumeroPag].R);
+    }
+    
+    printf("Modificando bits M de 10 paginas aleatorias:\n");
+    for(int i = 0; i < 10; i++) {
+        int NumeroPag = rand() % PaginasPrincipal;
+        memoriaPrincipal[NumeroPag].M = !memoriaPrincipal[NumeroPag].M;
+        paginasConBitCambiado[contadorBitsCambiados++] = NumeroPag;
+        printf("pagina %d: M cambio a %d\n", NumeroPag, memoriaPrincipal[NumeroPag].M);
+    }
+}
+
+
+void cargarPaginaMemoriaPrincipal(int paginaSecundaria) {
+    int numPaginaReemplazar = algoritmoClock();
+
+    bool duplicado = true;
+    for (int i = 0; i < PalabrasPorPagina; i++) {
+        if (strcmp(memoriaPrincipal[numPaginaReemplazar].palabras[i], 
+                   memoriaSecundaria[paginaSecundaria].palabras[i]) != 0) {
+            duplicado = false;
+            break;
+        }
+    }
+
+    if (duplicado) {
+        printf("La página %d ya contiene las mismas palabras, no se reemplaza.\n", numPaginaReemplazar);
+        return;
+    }
+
+    FILE *resultados = fopen("resultados.txt", "a");
+    if (resultados) {
+        fprintf(resultados, "Reemplazo: Pagina %d reemplazada por pagina secundaria %d\n", 
+                numPaginaReemplazar, paginaSecundaria);
+        fprintf(resultados, "Palabras copiadas:\n");
+    }
+
+    for(int i = 0; i < PalabrasPorPagina; i++) {
+        strcpy(memoriaPrincipal[numPaginaReemplazar].palabras[i], 
+               memoriaSecundaria[paginaSecundaria].palabras[i]);
+        if (resultados) fprintf(resultados, "%s ", memoriaPrincipal[numPaginaReemplazar].palabras[i]);
+    }
+
+    memoriaPrincipal[numPaginaReemplazar].R = 1;
+    memoriaPrincipal[numPaginaReemplazar].M = 0;
+    memoriaPrincipal[numPaginaReemplazar].referencias = 0;
+
+    
+    printf("pagina %d de secundaria cargada en posicion %d de memoria principal\n", paginaSecundaria, numPaginaReemplazar);
+}
+
 void pedirFrase() {
     char frase[200];
     char palabrasFrase[10][20]; 
     int contPalabras = 0;
     int contCol = 0;
    
+
     printf("INGRESE UNA FRASE: ");
     fgets(frase, sizeof(frase), stdin);
     
-    // Eliminar salto de línea
     size_t len = strlen(frase);
     if (len > 0 && frase[len-1] == '\n') {
         frase[len-1] = '\0';
+        len--;
     }
     
-    printf("Frase ingresada: %s\n", frase);
-
-    // Reinicializar contadores
+    if (!validarSoloLetras(frase)) {
+        printf("Error: La frase solo puede contener letras y espacios.\n");
+        return;
+    }
+    
     for (int i = 0; i < 26; i++) {
         iniciales[i].letra = 'a' + i;
         iniciales[i].cantidad = 0;
     }
     
-    len = strlen(frase);
-    char inicial = ' ';
-    int leyendoPalabra = 0;
+    char inicial=' ';
+    int leyendoPalabra = 0; // indica si se esta procesando la palabra
 
     for (int i = 0; i <= len; i++) {
         char c = frase[i];
 
         if (c != ' ' && c != '\0') {
-            if (leyendoPalabra == 0) {
-                leyendoPalabra = 1;
-                inicial = c;
+            if (leyendoPalabra==0) {
+                leyendoPalabra = 1; // empieza una nueva palabra
+                inicial=c;
                 if (contPalabras >= 10) break;
                 contCol = 0;
 
-                for (int j = 0; j < 26; j++) {
+               for (int j = 0; j < 26; j++) {//contar la inicial
                     if (iniciales[j].letra == inicial) {
                         iniciales[j].cantidad++;
                         break;
                     }
                 }
             }
-            palabrasFrase[contPalabras][contCol++] = c;
-        } 
-        else {
+            if (contCol < 19) {
+                palabrasFrase[contPalabras][contCol++] = c;
+            }
+        } else {
             if (leyendoPalabra) {
                 palabrasFrase[contPalabras][contCol] = '\0';
                 
-                // BUSCAR PALABRA EN MEMORIA
-                if (!buscarPalabraEnPrincipal(palabrasFrase[contPalabras])) {
-                    if (!buscarPalabraEnSecundaria(palabrasFrase[contPalabras])) {
-                        printf("Palabra no encontrada: %s\n", palabrasFrase[contPalabras]);
-                        fallosPagina++;
+                int encontrada = 0;
+                int paginaPrincipal = buscarPalabraEnPrincipal(palabrasFrase[contPalabras]);
+                
+                if (paginaPrincipal != -1) {
+                    encontrada = 1;
+                    printf("Palabra '%s' encontrada en principal pagina %d\n", 
+                           palabrasFrase[contPalabras], paginaPrincipal);
+                } else {
+                    fallosPagina++; 
+                    int paginaSecundaria = buscarPalabraEnSecundaria(palabrasFrase[contPalabras]);
+                    if (paginaSecundaria != -1) {
+                        encontrada = 1;
+                        printf("Palabra '%s' encontrada en secundaria pagina %d se cargara en principal \n", 
+                               palabrasFrase[contPalabras], paginaSecundaria);
+                        cargarPaginaMemoriaPrincipal(paginaSecundaria);
+                    } else {
+                        int posArchivo = buscarPalabraEnArchivo(palabrasFrase[contPalabras]);
+                        if (posArchivo != -1) {
+                            encontrada = 1;
+                            printf("Palabra '%s' encontrada en archivo\n", palabrasFrase[contPalabras]);
+                        } else {
+                            printf("Palabra no encontrada: %s\n", palabrasFrase[contPalabras]);
+                        }
                     }
                 }
                 
@@ -277,9 +365,9 @@ void pedirFrase() {
         }
     }
 
-    // Validaciones
+    // Validar minimo de palabras
     if (contPalabras < 6) {
-        printf("Error: se ingresaron %d palabras. El mínimo son 6.\n", contPalabras);
+        printf("Error: se ingresaron %d palabras el minimo son 6.\n", contPalabras);
         return;
     }
 
@@ -287,38 +375,35 @@ void pedirFrase() {
     for (int i = 0; i < 26; i++) {
         if (iniciales[i].cantidad > 2) {
             LimiteIniciales = 1;
-            printf("Error: más de 2 palabras con la letra inicial '%c'\n", iniciales[i].letra);
+            printf("Error: mas de 2 palabras con la letra inicial '%c'\n", iniciales[i].letra);
         }
     }
 
     if (LimiteIniciales == 1) {
-        printf("Por favor ingrese una frase donde ninguna letra inicial se repita más de 2 veces.\n");
+        printf("Por favor ingrese una frase donde ninguna letra inicial se repita mas de 2 veces.\n");
         return;
     }
-
-    printf("\nFrase válida (%d palabras):\n", contPalabras);
-    for (int i = 0; i < contPalabras; i++) {
-        printf("%s\n", palabrasFrase[i]);
-    }
     
-    // Ejecutar algoritmo de reemplazo (puedes elegir Clock o NRU)
-    algoritmoClock();
-    // algoritmoNRU();
+    printf("\nMODIFICACION DE BITS\n");
+    cambiarBits();
+    
+    /*for (int i = 0; i < contPalabras; i++) { para imprimir las palabras de la frase
+        printf("%s\n", palabrasFrase[i]);
+    }*/
     
     mostrarEstadisticas();
 }
 
 int main(void){
-    printf("Iniciando sistema de memoria...\n");
+    srand(time(NULL));
     cargarVectorPalabras();
     cargarPalabrasMemoriaPrincipal();
     cargarPalabrasMemoriaSecundaria();
     
-    // Bucle principal para múltiples frases
     while(1) {
         pedirFrase();
         
-        printf("\n¿Desea ingresar otra frase? (s/n): ");
+        printf("\n¿Desea ingresar otra frase? s - n: ");
         char respuesta[10];
         fgets(respuesta, sizeof(respuesta), stdin);
         if (respuesta[0] != 's' && respuesta[0] != 'S') {

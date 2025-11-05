@@ -1,0 +1,28 @@
+--Estadisticas--:
+Total de referencias: 0
+Total de reemplazos: 0
+Total de fallos de pagina: 8
+Promedio de referencias por paginas: 0.00
+------------------------------
+
+--Estadisticas--:
+Total de referencias: 0
+Total de reemplazos: 0
+Total de fallos de pagina: 0
+Promedio de referencias por paginas: 0.00
+------------------------------
+
+--Estadisticas--:
+Total de referencias: 0
+Total de reemplazos: 0
+Total de fallos de pagina: 6
+Promedio de referencias por paginas: 0.00
+------------------------------
+
+--Estadisticas--:
+Total de referencias: 0
+Total de reemplazos: 0
+Total de fallos de pagina: 6
+Promedio de referencias por paginas: 0.00
+------------------------------
+
