@@ -22,12 +22,14 @@ struct Pagina memoriaPrincipal[PaginasPrincipal];
 struct Pagina memoriaSecundaria[PaginasSecundaria];
 char palabrasArchivo[TotalPalabras][20];
 
-// Variables para estadisticas
+// Variables
 unsigned long totalReferencias = 0;
 unsigned long totalReemplazos = 0;
 unsigned long fallosPagina = 0;
 int paginasConBitCambiado[20];
 int contadorBitsCambiados = 0;
+int algoritmoSeleccionado = 0;
+static bool usado[TotalPalabras];
 
 struct Letra {
     char letra;
@@ -56,7 +58,8 @@ void menuImpresionMemoria();
 void mostrarPaginasMasReferenciadas();
 void mostrarPaginasQueCambiaronBit();
 int validarSoloLetras(char *frase);
-
+void menuSeleccionAlgoritmo();
+void contarPorInicialesArchivo();
 void cargarVectorPalabras(){
    FILE* archivo = fopen("palabras.txt", "r");
     if (!archivo) {
@@ -71,40 +74,81 @@ void cargarVectorPalabras(){
     }
     fclose(archivo);
 }
-
+void contarPorInicialesArchivo() {
+    int counts[26] = {0};
+    for (int i = 0; i < TotalPalabras; ++i) {
+        if (palabrasArchivo[i][0] == '\0') continue;
+        char c = tolower((unsigned char)palabrasArchivo[i][0]);
+        if (c >= 'a' && c <= 'z') counts[c - 'a']++;
+    }
+    printf("Conteo por inicial en palabrasArchivo (a..z):\n");
+    for (int i = 0; i < 26; ++i) {
+        printf("%c:%d ", 'a' + i, counts[i]);
+        if ((i+1) % 6 == 0) printf("\n");
+    }
+    printf("\n");
+}
 char* obtenerPalabra(int indexPalabra){
     return palabrasArchivo[indexPalabra];
 }
 
-void cargarPalabrasMemoriaPrincipal(){
+
+
+void cargarPalabrasMemoriaSecundaria() {
     int cont = 0;
-    for(int i=0; i<PaginasPrincipal; i++){
-        for(int j=0; j<PalabrasPorPagina; j++){
-            if(cont % 18 == 0){
-                 cont += 342;
+    // inicializar usados
+    for (int i = 0; i < TotalPalabras; ++i){
+        usado[i] = false;
+    } 
+
+    for (int i = 0; i < PaginasSecundaria; ++i) {
+        memoriaSecundaria[i].referencias = 0;
+        for (int j = 0; j < PalabrasPorPagina; ++j) {
+            
+            if (cont % 36 == 0) {
+                cont = (cont + 324) % TotalPalabras;
             }
-            strcpy(memoriaPrincipal[i].palabras[j], obtenerPalabra(cont));
-            memoriaPrincipal[i].R = 0;
-            memoriaPrincipal[i].M = 0;
-            memoriaPrincipal[i].referencias = 0;
-            cont++;
+            
+            int intentos = 0;
+            while (intentos < TotalPalabras && usado[cont]) {
+                cont = (cont + 1) % TotalPalabras;
+                intentos++;
+            }
+           
+            strcpy(memoriaSecundaria[i].palabras[j], obtenerPalabra(cont));
+            usado[cont] = true;
+            cont = (cont + 1) % TotalPalabras;
+            
         }
     }
 }
 
-void cargarPalabrasMemoriaSecundaria(){
+void cargarPalabrasMemoriaPrincipal() {
     int cont = 0;
-    for(int i=0; i<PaginasSecundaria; i++){
-        for(int j=0; j<PalabrasPorPagina; j++){
-            if(cont % 36 == 0){
-                cont += 324;
+    for (int i = 0; i < PaginasPrincipal; ++i) {
+        memoriaPrincipal[i].R = 0;
+        memoriaPrincipal[i].M = 0;
+        memoriaPrincipal[i].referencias = 0;
+        for (int j = 0; j < PalabrasPorPagina; ++j) {
+            
+            if (cont % 18 == 0) {//saltar a la otra letra
+                cont = (cont + 342) % TotalPalabras;
             }
-            strcpy(memoriaSecundaria[i].palabras[j], obtenerPalabra(cont));
-            memoriaSecundaria[i].referencias = 0;
-            cont++;
+            
+            int intentos = 0;
+            while (intentos < TotalPalabras && usado[cont]) {
+                cont = (cont + 1) % TotalPalabras;
+                intentos++;
+            }
+           
+            strcpy(memoriaPrincipal[i].palabras[j], obtenerPalabra(cont));
+            usado[cont] = true;
+            cont = (cont + 1) % TotalPalabras;
+            
         }
     }
 }
+
 
 void imprimirMemoriaPrincipal(){
     for(int i=0;i<81;i++){
@@ -183,7 +227,59 @@ int algoritmoClock() {
     
     return paginaReemplazo;
 }
-
+int algoritmoNRU() {
+    int paginaReemplazo = -1;
+    
+    // Buscar en las 4 categorias del NRU 
+    //R=0, M=0
+    for (int i = 0; i < PaginasPrincipal; i++) {
+        if (memoriaPrincipal[i].R == 0 && memoriaPrincipal[i].M == 0) { 
+            paginaReemplazo = i; 
+            break; 
+        }
+    }
+    
+    //R=0 M=1
+    if (paginaReemplazo == -1) {
+        for (int i = 0; i < PaginasPrincipal; i++) {
+            if (memoriaPrincipal[i].R == 0 && memoriaPrincipal[i].M == 1) { 
+                paginaReemplazo = i; 
+                break; 
+            }
+        }
+    }
+    
+    //R=1 M=0
+    if (paginaReemplazo == -1) {
+        for (int i = 0; i < PaginasPrincipal; i++) {
+            if (memoriaPrincipal[i].R == 1 && memoriaPrincipal[i].M == 0) { 
+                paginaReemplazo = i; 
+                break; 
+            }
+        }
+    }
+    
+    //R=1 M=1 
+    if (paginaReemplazo == -1) {
+        for (int i = 0; i < PaginasPrincipal; i++) {
+            if (memoriaPrincipal[i].R == 1 && memoriaPrincipal[i].M == 1) { 
+                paginaReemplazo = i; 
+                break; 
+            }
+        }
+    }
+    
+    // Si no encontro ninguna se usa la primera 
+    if (paginaReemplazo == -1) {
+        paginaReemplazo = 0;
+        printf("No se encontro pagina candidata usando la pagina %d\n", paginaReemplazo);
+    } else {
+        printf("Reemplazando pagina %d \n", paginaReemplazo);
+    }
+    
+    totalReemplazos++;
+    return paginaReemplazo;  //return numero de pagina
+}
 void mostrarEstadisticas() {
     printf("\nESTADISTICAS \n");
     printf("Total de referencias: %lu\n", totalReferencias);
@@ -199,7 +295,7 @@ void mostrarEstadisticas() {
 void guardarEstadisticasEnArchivo() {
     FILE *f = fopen("resultados.txt", "a");
   
-    fprintf(f, "--Estadisticas--:\n");
+    fprintf(f, "Estadisticas:\n");
     fprintf(f, "Total de referencias: %lu\n", totalReferencias);
     fprintf(f, "Total de reemplazos: %lu\n", totalReemplazos);
     fprintf(f, "Total de fallos de pagina: %lu\n", fallosPagina);
@@ -208,7 +304,7 @@ void guardarEstadisticasEnArchivo() {
         totalUsos += memoriaPrincipal[i].referencias;
     fprintf(f, "Promedio de referencias por paginas: %.2f\n",
             (float) totalUsos / PaginasPrincipal);
-    fprintf(f, "------------------------------\n\n");
+   
     fclose(f);
     printf("Estadisticas guardadas en resultados.txt\n");
 }
@@ -243,33 +339,24 @@ void cambiarBits() {
 
 
 void cargarPaginaMemoriaPrincipal(int paginaSecundaria) {
-    int numPaginaReemplazar = algoritmoClock();
-
-    bool duplicado = true;
-    for (int i = 0; i < PalabrasPorPagina; i++) {
-        if (strcmp(memoriaPrincipal[numPaginaReemplazar].palabras[i], 
-                   memoriaSecundaria[paginaSecundaria].palabras[i]) != 0) {
-            duplicado = false;
-            break;
-        }
+    int numPaginaReemplazar = 0;
+    if(algoritmoSeleccionado==0){
+        numPaginaReemplazar=algoritmoClock();       
+    }else{
+        numPaginaReemplazar=algoritmoNRU();
     }
 
-    if (duplicado) {
-        printf("La página %d ya contiene las mismas palabras, no se reemplaza.\n", numPaginaReemplazar);
-        return;
-    }
 
     FILE *resultados = fopen("resultados.txt", "a");
-    if (resultados) {
-        fprintf(resultados, "Reemplazo: Pagina %d reemplazada por pagina secundaria %d\n", 
-                numPaginaReemplazar, paginaSecundaria);
-        fprintf(resultados, "Palabras copiadas:\n");
-    }
+    
+    fprintf(resultados, "Reemplazo: Pagina %d reemplazada por pagina secundaria %d\n", numPaginaReemplazar, paginaSecundaria);
+    fprintf(resultados, "Palabras copiadas:\n");
 
     for(int i = 0; i < PalabrasPorPagina; i++) {
-        strcpy(memoriaPrincipal[numPaginaReemplazar].palabras[i], 
-               memoriaSecundaria[paginaSecundaria].palabras[i]);
-        if (resultados) fprintf(resultados, "%s ", memoriaPrincipal[numPaginaReemplazar].palabras[i]);
+        strcpy(memoriaPrincipal[numPaginaReemplazar].palabras[i],memoriaSecundaria[paginaSecundaria].palabras[i]);
+
+        fprintf(resultados, "%s ", memoriaPrincipal[numPaginaReemplazar].palabras[i]);
+        
     }
 
     memoriaPrincipal[numPaginaReemplazar].R = 1;
@@ -392,15 +479,119 @@ void pedirFrase() {
     }*/
     
     mostrarEstadisticas();
+    mostrarPaginasMasReferenciadas();
+    mostrarPaginasQueCambiaronBit();
+    menuImpresionMemoria();
+}
+void menuSeleccionAlgoritmo() {
+    int opcion=0;
+    int c;
+    printf("INGRESE EL ALGORITMO QUE DESEA IMPLEMENTAR (0-CLOCK) (1- NRU)");
+
+    scanf("%d", &opcion);
+    while ((c = getchar()) != '\n' && c != EOF);
+
+    if(opcion==0){
+        algoritmoSeleccionado=0;
+    }else{
+         algoritmoSeleccionado=1;
+    }
+
+}
+void mostrarPaginasMasReferenciadas(){
+    // En lugar de copiar las páginas, copiar ÍNDICES
+    int indicesPrincipal[PaginasPrincipal];
+    int indicesSecundaria[PaginasSecundaria];
+    
+    // Inicializar índices
+    for(int i = 0; i < PaginasPrincipal; i++) {
+        indicesPrincipal[i] = i;  // guardar los indices originales 
+    }
+    for(int i = 0; i < PaginasSecundaria; i++) {
+        indicesSecundaria[i] = i; 
+    }
+    // burble sort
+    for(int i = 0; i < PaginasPrincipal - 1; i++) {
+        for(int j = 0; j < PaginasPrincipal - i - 1; j++) {
+            if(memoriaPrincipal[indicesPrincipal[j]].referencias < 
+               memoriaPrincipal[indicesPrincipal[j+1]].referencias) {
+        
+                int temp = indicesPrincipal[j];
+                indicesPrincipal[j] = indicesPrincipal[j+1];
+                indicesPrincipal[j+1] = temp;
+            }
+        }
+    }
+    
+    // Hacer lo mismo para secundaria
+    for(int i = 0; i < PaginasSecundaria - 1; i++) {
+        for(int j = 0; j < PaginasSecundaria - i - 1; j++) {
+            if(memoriaSecundaria[indicesSecundaria[j]].referencias < 
+               memoriaSecundaria[indicesSecundaria[j+1]].referencias) {
+        
+                int temp = indicesSecundaria[j];
+                indicesSecundaria[j] = indicesSecundaria[j+1];
+                indicesSecundaria[j+1] = temp;
+            }
+        }
+    }
+    
+    printf("\n 10 PAGINAS MAS REFERENCIADAS \n");
+    
+    printf("\nMEMORIA PRINCIPAL:\n");
+    for(int i = 0; i < 10 && i < PaginasPrincipal; i++) {
+        int numPagina = indicesPrincipal[i];
+        printf("%d pagina %d - %lu referencias\n", 
+               i+1, numPagina, memoriaPrincipal[numPagina].referencias);
+    }
+    
+    printf("\nMEMORIA SECUNDARIA:\n");
+    for(int i = 0; i < 10 && i < PaginasSecundaria; i++) {
+        int numPagina = indicesSecundaria[i];
+        printf("%d- pagina %d - %lu referencias\n", i+1, numPagina, memoriaSecundaria[numPagina].referencias);
+    }
+}
+void mostrarPaginasQueCambiaronBit() {
+    printf("\n PAGINAS QUE CAMBIARON BIT \n");
+    if (contadorBitsCambiados == 0) {
+        printf("No hubo cambios de bits en esta iteracion.\n");
+        return;
+    }
+    
+    for (int i = 0; i < contadorBitsCambiados; i++) {
+        int numPagina = paginasConBitCambiado[i];
+        printf("pagina %d - R=%d, M=%d\n", numPagina, memoriaPrincipal[numPagina].R, memoriaPrincipal[numPagina].M);
+    }
 }
 
+void menuImpresionMemoria() {
+    int opcion;
+    printf("\n¿Que memoria desea imprimir?\n");
+    printf("1. Memoria Principal\n");
+    printf("2. Memoria Secundaria\n");
+    printf("Opcion: ");
+   
+    scanf("%d", &opcion);
+    
+    
+    if(opcion == 1) {
+        imprimirMemoriaPrincipal();
+    } else if(opcion == 2) {
+        imprimirMemoriaSecundaria();
+    }
+}
 int main(void){
+    for(int i=0;i<TotalPalabras;i++){//inicializar vector de usados
+        usado[i]=false;
+    }
     srand(time(NULL));
     cargarVectorPalabras();
-    cargarPalabrasMemoriaPrincipal();
     cargarPalabrasMemoriaSecundaria();
-    
+    cargarPalabrasMemoriaPrincipal();
+     contarPorInicialesArchivo();
+    menuSeleccionAlgoritmo();
     while(1) {
+
         pedirFrase();
         
         printf("\n¿Desea ingresar otra frase? s - n: ");
@@ -410,7 +601,7 @@ int main(void){
             break;
         }
     }
-    
+   
     guardarEstadisticasEnArchivo();
     return 0;
 }
